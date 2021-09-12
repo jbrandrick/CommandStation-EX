@@ -118,7 +118,7 @@ void WiThrottle::parse(RingStream * stream, byte * cmdx) {
     if (DCC_MANAGER->turnouts->hasChanged ()) {  // WAS if (turnoutListHash != Turnout::turnoutlistHash) {
       StringFormatter::send(stream,F("PTL"));
 
-      DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->sendWifi (stream); }); // WAS
+      DCC_MANAGER->turnouts->walkList ([stream] (Turnout* turnout) { turnout->sendWifi (stream); }); // WAS
       StringFormatter::send(stream,F("\n"));
        
       DCC_MANAGER->turnouts->resetChanged (); // WAS  turnoutListHash = Turnout::turnoutlistHash; // keep a copy of hash for later comparison

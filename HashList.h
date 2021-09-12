@@ -31,6 +31,12 @@ class HashList {
     template <typename FTN>
     void walkList (FTN ftn) {
       for (Node* pNode = getRootNode (); pNode != nullptr; pNode = pNode->pNext) {
+        ftn (pNode->data);
+      }
+    }
+    template <typename FTN>
+    void walkListWithKey (FTN ftn) {
+      for (Node* pNode = getRootNode (); pNode != nullptr; pNode = pNode->pNext) {
         ftn (pNode->key, pNode->data);
       }
     }
@@ -63,7 +69,7 @@ class HashList {
     };
 
     void bumpChanged () {
-      if (seqBase > 64000)
+      if (seqBase > 64000)  // issues here
         seqBase = seq = 0;
       seq++;
     }
@@ -115,6 +121,7 @@ class HashList {
     }
 };
 
+// ensure these are present during incremental compile
 template class HashList<Turnout>;
 template class HashList<Sensor>;
 template class HashList<Output>;

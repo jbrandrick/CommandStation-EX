@@ -52,8 +52,6 @@ void DCC::begin(const FSH * motorShieldName, MotorDriver * mainDriver, MotorDriv
   shieldName=(FSH *)motorShieldName;
   StringFormatter::send(Serial,F("<iDCC-EX V-%S / %S / %S G-%S>\n"), F(VERSION), F(ARDUINO_TYPE), shieldName, F(GITHUB_SHA));
 
-  // init DCC_MANAGER
-  DCC_MANAGER->init ();
   // Load stuff from EEprom
   (void)EEPROM; // tell compiler not to warn this is unused
   DCC_MANAGER->eeStore->init ();  // WAS EEStore::init();

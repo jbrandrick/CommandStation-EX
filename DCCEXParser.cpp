@@ -496,16 +496,16 @@ void DCCEXParser::parse(Print *stream, byte *com, RingStream * ringStream)
         return;
 
     case 'Q': // SENSORS <Q>
-        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->send (stream); });
+        DCC_MANAGER->sensors->walkList ([stream] (Sensor* sensor) { sensor->send (stream); });
         return;
 
     case 's': // <s>
         StringFormatter::send(stream, F("<p%d>\n"), DCCWaveform::mainTrack.getPowerMode() == POWERMODE::ON);
         StringFormatter::send(stream, F("<iDCC-EX V-%S / %S / %S G-%S>\n"), F(VERSION), F(ARDUINO_TYPE), DCC::getMotorShieldName(), F(GITHUB_SHA));
 
-        DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->send (stream); });
-        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->send (stream); });
-        DCC_MANAGER->outputs->walkList ([stream] (int _key, Output* output) { output->send (stream); });
+        DCC_MANAGER->turnouts->walkList ([stream] (Turnout* turnout) { turnout->send (stream); });
+        DCC_MANAGER->sensors->walkList ([stream] (Sensor* sensor) { sensor->send (stream); });
+        DCC_MANAGER->outputs->walkList ([stream] (Output* output) { output->send (stream); });
         // TODO Send stats of  speed reminders table
         return;       
 
@@ -599,7 +599,7 @@ bool DCCEXParser::parseZ (Print *stream, int16_t paramCount, int16_t param[]) //
 
     case 0: // <Z> list Output definitions
       if (DCC_MANAGER->outputs->size () > 0) {
-        DCC_MANAGER->outputs->walkList ([stream] (int _key, Output* output) { output->sendDef (stream); });
+        DCC_MANAGER->outputs->walkList ([stream] (Output* output) { output->sendDef (stream); });
         return true;
       }
       return false;
@@ -660,7 +660,7 @@ bool DCCEXParser::parseT (Print *stream, int16_t paramCount, int16_t params[]) /
   {
     case 0: // <T>  list turnout definitions
       if (DCC_MANAGER->turnouts->size () > 0) {
-        DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->sendDef (stream); });
+        DCC_MANAGER->turnouts->walkList ([stream] (Turnout* turnout) { turnout->sendDef (stream); });
         return true;
       }
       return false;
@@ -719,7 +719,7 @@ bool DCCEXParser::parseS (Print *stream, int16_t paramCount, int16_t params[])  
 
     case 0: // <S> list sensor definitions
       if (DCC_MANAGER->sensors->size () > 0) {
-        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->sendDef (stream); });
+        DCC_MANAGER->sensors->walkList ([stream] (Sensor* sensor) { sensor->sendDef (stream); });
         return true;
       }
       return false;

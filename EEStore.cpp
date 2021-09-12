@@ -19,88 +19,114 @@
  *  along with CommandStation.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "EEStore.h"
-#include "Turnouts.h"
-#include "Sensors.h"
-#include "Outputs.h"
+#include "Turnout.h"
+#include "Sensor.h"
+#include "Output.h"
 #include "DIAG.h"
+#include "DccManager.h"
+
 
 #if defined(ARDUINO_ARCH_SAMD)
-ExternalEEPROM EEPROM;
+  ExternalEEPROM EEPROM;
 #endif
 
-void EEStore::init(){
+void EEStore::init () {
+
 #if defined(ARDUINO_ARCH_SAMD)
-    EEPROM.begin(0x50);     // Address for Microchip 24-series EEPROM with all three A pins grounded (0b1010000 = 0x50)
+  EEPROM.begin(0x50);     // Address for Microchip 24-series EEPROM with all three A pins grounded (0b1010000 = 0x50)
 #endif
 
-    eeStore=(EEStore *)calloc(1,sizeof(EEStore));
-    
-    EEPROM.get(0,eeStore->data);                                       // get eeStore data
 
-    if(strncmp(eeStore->data.id,EESTORE_ID,sizeof(EESTORE_ID))!=0){    // check to see that eeStore contains valid DCC++ ID
-        sprintf(eeStore->data.id,EESTORE_ID);                           // if not, create blank eeStore structure (no turnouts, no sensors) and save it back to EEPROM
-        eeStore->data.nTurnouts=0;
-        eeStore->data.nSensors=0;
-        eeStore->data.nOutputs=0;
-        EEPROM.put(0,eeStore->data);
-    }
+  EEPROM.get (0, data);
 
-    reset();            // set memory pointer to first free EEPROM space
-    Turnout::load();    // load turnout definitions
-    Sensor::load();     // load sensor definitions
-    Output::load();     // load output definitions
+  // check to see that eeStore contains valid DCC++ ID
+  // if not, create blank eeStore structure (no turnouts, no sensors) and save it back to EEPROM
+  if (strncmp (data.id, EESTORE_ID, sizeof(EESTORE_ID)) != 0)
+    clearStoreData ();
 
+  resetPointer ();
+
+  loadTurnouts ();
+  loadSensors ();
+  loadOutputs ();
 }
 
-///////////////////////////////////////////////////////////////////////////////
 
-void EEStore::clear(){
+void EEStore::loadTurnouts () {
+  Turnout* turnout;
+  TurnoutData turnoutData;
 
-    sprintf(eeStore->data.id,EESTORE_ID);                           // create blank eeStore structure (no turnouts, no sensors) and save it back to EEPROM
-    eeStore->data.nTurnouts=0;
-    eeStore->data.nSensors=0;
-    eeStore->data.nOutputs=0;
-    EEPROM.put(0,eeStore->data);
-
+  for ( int i = 0; i < data.nTurnouts; i++ ) {
+    EEPROM.get ( eeAddress, turnoutData );
+    turnout = DCC_MANAGER->turnouts->getOrAdd (turnoutData.id);
+    turnout->populate (turnoutData);
+    turnout->setTurnoutDataOffset (eeAddress);
+    advancePointer (sizeof(turnoutData));
+  }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+void EEStore::loadSensors () {
+  Sensor* sensor;
+  SensorData sensorData;
 
-void EEStore::store(){
-    reset();
-    Turnout::store();
-    Sensor::store();
-    Output::store();
-    EEPROM.put(0,eeStore->data);
+  for ( int i = 0; i < data.nSensors; i++ ) {
+    EEPROM.get (eeAddress, sensorData);
+    sensor = DCC_MANAGER->sensors->getOrAdd (sensorData.snum);
+    sensor->populate (sensorData);
+    advancePointer (sizeof(sensorData));
+  }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+void EEStore::loadOutputs () {
+  Output* output;
+  OutputData outputData;
 
-void EEStore::advance(int n){
-    eeAddress+=n;
+  for ( int i = 0; i < data.nOutputs; i++ ) {
+    EEPROM.get (eeAddress, outputData);
+    output = DCC_MANAGER->outputs->getOrAdd (outputData.id);
+    output->populate (outputData);
+    output->setOutputDataOffset (eeAddress);
+    advancePointer (sizeof(outputData));
+  }
 }
 
-///////////////////////////////////////////////////////////////////////////////
 
-void EEStore::reset(){
-    eeAddress=sizeof(EEStore);
-}
-///////////////////////////////////////////////////////////////////////////////
+void EEStore::store (){
+    if (Diag::CMD)
+        DIAG(F("EEStore::store"));
+    resetPointer ();
 
-int EEStore::pointer(){
-    return(eeAddress);
+    data.nTurnouts = 0;
+    DCC_MANAGER->turnouts->walkList ([this] (int _key, Turnout* turnout) mutable {
+      EEPROM.put (eeAddress, turnout->data);
+      turnout->setTurnoutDataOffset (eeAddress);
+      advancePointer (sizeof(TurnoutData));
+    });
+    data.nTurnouts = DCC_MANAGER->turnouts->size ();
+
+    data.nSensors = 0;
+    DCC_MANAGER->sensors->walkList ([this] (int _key, Sensor* sensor) {
+      EEPROM.put (eeAddress, sensor->data);
+      advancePointer (sizeof(SensorData));
+    });
+    data.nSensors = DCC_MANAGER->sensors->size ();
+
+    data.nOutputs = 0;
+    DCC_MANAGER->outputs->walkList ([this] (int _key, Output* output) {
+      EEPROM.put (eeAddress, output->data);
+      output->setOutputDataOffset (eeAddress);
+      advancePointer (sizeof(OutputData));
+    });
+    data.nOutputs = DCC_MANAGER->outputs->size ();
+
+    EEPROM.put (0, data);
 }
-///////////////////////////////////////////////////////////////////////////////
 
 void EEStore::dump(int num) {
-    byte b;
-    DIAG(F("Addr  0x  char"));
-    for (int n=0 ; n<num; n++) {
+  byte b;
+  DIAG(F("Addr  0x  char"));
+  for (int n=0 ; n<num; n++) {
 	EEPROM.get(n, b);
 	DIAG(F("%d     %x    %c"),n,b,isprint(b) ? b : ' ');
-    }
+  }
 }
-///////////////////////////////////////////////////////////////////////////////
-
-EEStore *EEStore::eeStore=NULL;
-int EEStore::eeAddress=0;

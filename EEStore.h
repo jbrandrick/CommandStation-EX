@@ -21,6 +21,7 @@
 #define EEStore_h
 
 #include <Arduino.h>
+#include "StringFormatter.h"
 
 #if defined(ARDUINO_ARCH_SAMD)
 #include <SparkFun_External_EEPROM.h>
@@ -31,24 +32,50 @@ extern ExternalEEPROM EEPROM;
 
 #define EESTORE_ID "DCC++"
 
-struct EEStoreData{
+struct EEStoreData {
   char id[sizeof(EESTORE_ID)];
-  uint16_t nTurnouts;
-  uint16_t nSensors;
-  uint16_t nOutputs;
+  int nTurnouts;
+  int nSensors;  
+  int nOutputs;
 };
 
-struct EEStore{
-  static EEStore *eeStore;
+class EEStore {
+
   EEStoreData data;
-  static int eeAddress;
-  static void init();
-  static void reset();
-  static int pointer();
-  static void advance(int);
-  static void store();
-  static void clear();
-  static void dump(int);
+  int         eeAddress;
+
+  void loadTurnouts ();
+  void loadSensors ();
+  void loadOutputs ();
+
+  void advancePointer (int offset) {
+    eeAddress += offset;
+  }
+  void resetPointer () {
+    eeAddress = sizeof(EEStoreData);
+  }
+  int pointer () {
+    return eeAddress;
+  }
+
+  public:
+
+    EEStore () {}
+
+    void init ();
+    void store ();
+    void dump (int);
+
+    void clearStoreData () {
+      sprintf (data.id, EESTORE_ID);
+      data.nTurnouts = 0;
+      data.nSensors  = 0;
+      data.nOutputs  = 0;
+      EEPROM.put (0, data);
+    }
+    void send (Print* stream) {
+      StringFormatter::send (stream, F("<e %d %d %d>\n"), data.nTurnouts, data.nSensors, data.nOutputs);
+    }
 };
 
 #endif

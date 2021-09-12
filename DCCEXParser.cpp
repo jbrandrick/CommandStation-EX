@@ -18,12 +18,13 @@
  *  along with CommandStation.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "StringFormatter.h"
+#include "DccManager.h"
 #include "DCCEXParser.h"
 #include "DCC.h"
 #include "DCCWaveform.h"
-#include "Turnouts.h"
-#include "Outputs.h"
-#include "Sensors.h"
+#include "Turnout.h"
+#include "Output.h"
+#include "Sensor.h"
 #include "freeMemory.h"
 #include "GITHUB_SHA.h"
 #include "version.h"
@@ -106,7 +107,8 @@ void DCCEXParser::loop(Stream &stream)
             buffer[bufferLength++] = ch;
         }
     }
-    Sensor::checkAll(&stream); // Update and print changes
+
+    DCC_MANAGER->checkSensor (stream); // WAS Sensor::checkAll(&stream);
 }
 
 int16_t DCCEXParser::splitValues(int16_t result[MAX_COMMAND_PARAMS], const byte *cmd)
@@ -494,25 +496,25 @@ void DCCEXParser::parse(Print *stream, byte *com, RingStream * ringStream)
         return;
 
     case 'Q': // SENSORS <Q>
-        Sensor::printAll(stream);
+        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->send (stream); });
         return;
 
     case 's': // <s>
         StringFormatter::send(stream, F("<p%d>\n"), DCCWaveform::mainTrack.getPowerMode() == POWERMODE::ON);
         StringFormatter::send(stream, F("<iDCC-EX V-%S / %S / %S G-%S>\n"), F(VERSION), F(ARDUINO_TYPE), DCC::getMotorShieldName(), F(GITHUB_SHA));
-        Turnout::printAll(stream); //send all Turnout states
-        Output::printAll(stream);  //send all Output  states
-        Sensor::printAll(stream);  //send all Sensor  states
+
+        DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->send (stream); });
+        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->send (stream); });
+        DCC_MANAGER->outputs->walkList ([stream] (int _key, Output* output) { output->send (stream); });
         // TODO Send stats of  speed reminders table
         return;       
 
     case 'E': // STORE EPROM <E>
-        EEStore::store();
-        StringFormatter::send(stream, F("<e %d %d %d>\n"), EEStore::eeStore->data.nTurnouts, EEStore::eeStore->data.nSensors, EEStore::eeStore->data.nOutputs);
+        DCC_MANAGER->eeStore->send (stream);  //  WAS
         return;
 
     case 'e': // CLEAR EPROM <e>
-        EEStore::clear();
+        DCC_MANAGER->eeStore->clearStoreData();  // WAS
         StringFormatter::send(stream, F("<O>\n"));
         return;
 
@@ -562,51 +564,49 @@ void DCCEXParser::parse(Print *stream, byte *com, RingStream * ringStream)
     StringFormatter::send(stream, F("<X>\n"));
 }
 
-bool DCCEXParser::parseZ(Print *stream, int16_t params, int16_t p[])
+bool DCCEXParser::parseZ (Print *stream, int16_t paramCount, int16_t param[]) // WAS
 {
+  Output* output;
 
-    switch (params)
-    {
-    
+  switch (paramCount)
+  {
     case 2: // <Z ID ACTIVATE>
-    {
-        Output *o = Output::get(p[0]);
-        if (o == NULL)
-            return false;
-        o->activate(p[1]);
-        StringFormatter::send(stream, F("<Y %d %d>\n"), p[0], p[1]);
-    }
-        return true;
+      output = DCC_MANAGER->outputs->get (param[0]);
+      if (output == nullptr)
+          return false;
+
+      output->activate (param[1]);
+      StringFormatter::send(stream, F("<Y %d %d>\n"), param[0], param[1]);
+      return true;
 
     case 3: // <Z ID PIN IFLAG>
-        if (p[0] < 0 ||
-	    p[1] > 255 || p[1] <= 1 || // Pins 0 and 1 are Serial to USB
-	    p[2] <   0 || p[2] > 7 )
-	  return false;
-        if (!Output::create(p[0], p[1], p[2], 1))
-          return false;
-        StringFormatter::send(stream, F("<O>\n"));
-        return true;
+      if (param[0] < 0  ||
+	        param[1] > 255  ||  param[1] <= 1 || // Pins 0 and 1 are Serial to USB
+	        param[2] <   0  ||  param[2] > 7 )
+	          return false;
+
+      output = DCC_MANAGER->outputs->getOrAdd (param[0]);
+      output->populate (param[0], param[1], param[2]);
+      StringFormatter::send (stream, F("<O>\n"));
+      return true;
 
     case 1: // <Z ID>
-        if (!Output::remove(p[0]))
-          return false;
-        StringFormatter::send(stream, F("<O>\n"));
+      if (DCC_MANAGER->outputs->remove (param[0])) {
+        StringFormatter::send (stream, F("<O>\n"));
         return true;
+      }
+      return false;
 
     case 0: // <Z> list Output definitions
-    {
-        bool gotone = false;
-        for (Output *tt = Output::firstOutput; tt != NULL; tt = tt->nextOutput)
-        {
-            gotone = true;
-            StringFormatter::send(stream, F("<Y %d %d %d %d>\n"), tt->data.id, tt->data.pin, tt->data.iFlag, tt->data.oStatus);
-        }
-        return gotone;
-    }
+      if (DCC_MANAGER->outputs->size () > 0) {
+        DCC_MANAGER->outputs->walkList ([stream] (int _key, Output* output) { output->sendDef (stream); });
+        return true;
+      }
+      return false;
+        
     default:
-        return false;
-    }
+      return false;
+  }
 }
 
 //===================================
@@ -652,79 +652,81 @@ void DCCEXParser::funcmap(int16_t cab, byte value, byte fstart, byte fstop)
 }
 
 //===================================
-bool DCCEXParser::parseT(Print *stream, int16_t params, int16_t p[])
+bool DCCEXParser::parseT (Print *stream, int16_t paramCount, int16_t params[]) //WAS
 {
-    switch (params)
-    {
+  Turnout* turnout;
+
+  switch (paramCount)
+  {
     case 0: // <T>  list turnout definitions
-    {
-        bool gotOne = false;
-        for (Turnout *tt = Turnout::firstTurnout; tt != NULL; tt = tt->nextTurnout)
-        {
-            gotOne = true;
-            StringFormatter::send(stream, F("<H %d %d %d %d>\n"), tt->data.id, tt->data.address, 
-                tt->data.subAddress, (tt->data.tStatus & STATUS_ACTIVE)!=0);
-        }
-        return gotOne; // will <X> if none found
-    }
+      if (DCC_MANAGER->turnouts->size () > 0) {
+        DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->sendDef (stream); });
+        return true;
+      }
+      return false;
 
     case 1: // <T id>  delete turnout
-        if (!Turnout::remove(p[0]))
-            return false;
-        StringFormatter::send(stream, F("<O>\n"));
+      if (DCC_MANAGER->turnouts->remove (params[0])) {
+        StringFormatter::send (stream, F("<O>\n"));
         return true;
+      }
+      return false;
 
     case 2: // <T id 0|1>  activate turnout
-    {
-        Turnout *tt = Turnout::get(p[0]);
-        if (!tt)
-            return false;
-        tt->activate(p[1]);
-        StringFormatter::send(stream, F("<H %d %d>\n"), tt->data.id, (tt->data.tStatus & STATUS_ACTIVE)!=0);
-    }
-        return true;
+      turnout = DCC_MANAGER->turnouts->get (params[0]);
+      if (turnout == nullptr)
+          return false;
+
+      turnout->activate (params[1]);
+      StringFormatter::send(stream, F("<H %d %d>\n"), turnout->data.id, turnout->isActive ());
+      return true;
 
     case 3: // <T id addr subaddr>  define turnout
-        if (!Turnout::create(p[0], p[1], p[2]))
-            return false;
-        StringFormatter::send(stream, F("<O>\n"));
-        return true;
+      turnout = DCC_MANAGER->turnouts->getOrAdd (params[0]);
+      turnout->populate (params[0], params[1], params[2]);
+      StringFormatter::send (stream, F("<O>\n"));
+      return true;
 
     default:
-        return false; // will <x>
-    }
+      return false; // will <x>
+  }
 }
 
-bool DCCEXParser::parseS(Print *stream, int16_t params, int16_t p[])
+bool DCCEXParser::parseS (Print *stream, int16_t paramCount, int16_t params[])  // WAS
 {
+  Sensor* sensor;
 
-    switch (params)
-    {
+  switch (paramCount)
+  {
+    case 4: // <S id pin pullup threshold>  create analog sensor. pullUp indicator (0=LOW/1=HIGH)
+      sensor = DCC_MANAGER->sensors->getOrAdd (params[0]);
+      sensor->populate (SENSOR_TYPE::ANALOG, params[0], params[1], params[2], params[3]);
+      StringFormatter::send (stream, F("<O>\n"));
+      return true;
+
     case 3: // <S id pin pullup>  create sensor. pullUp indicator (0=LOW/1=HIGH)
-        if (!Sensor::create(p[0], p[1], p[2]))
-          return false;
-        StringFormatter::send(stream, F("<O>\n"));
-        return true;
+      sensor = DCC_MANAGER->sensors->getOrAdd (params[0]);
+      sensor->populate (SENSOR_TYPE::DIGITAL, params[0], params[1], params[2]);
+      StringFormatter::send (stream, F("<O>\n"));
+      return true;
 
     case 1: // S id> remove sensor
-        if (!Sensor::remove(p[0]))
-          return false;
-        StringFormatter::send(stream, F("<O>\n"));
+      if (DCC_MANAGER->sensors->remove (params[0])) {
+        StringFormatter::send (stream, F("<O>\n"));
         return true;
+      }
+      return false;
 
     case 0: // <S> list sensor definitions
-	if (Sensor::firstSensor == NULL)
-	    return false;
-        for (Sensor *tt = Sensor::firstSensor; tt != NULL; tt = tt->nextSensor)
-        {
-            StringFormatter::send(stream, F("<Q %d %d %d>\n"), tt->data.snum, tt->data.pin, tt->data.pullUp);
-        }
+      if (DCC_MANAGER->sensors->size () > 0) {
+        DCC_MANAGER->sensors->walkList ([stream] (int _key, Sensor* sensor) { sensor->sendDef (stream); });
         return true;
+      }
+      return false;
 
-    default: // invalid number of arguments
-        break;
-    }
-    return false;
+    default:
+      return false;
+  }
 }
 
 bool DCCEXParser::parseD(Print *stream, int16_t params, int16_t p[])
@@ -793,7 +795,7 @@ bool DCCEXParser::parseD(Print *stream, int16_t params, int16_t p[])
         
     case HASH_KEYWORD_EEPROM: // <D EEPROM NumEntries>
 	if (params >= 2)
-	    EEStore::dump(p[1]);
+	    DCC_MANAGER->eeStore->dump (p[1]);
 	return true;
 
     case HASH_KEYWORD_SPEED28:

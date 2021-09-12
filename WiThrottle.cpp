@@ -42,9 +42,10 @@
 #include <Arduino.h>
 #include "WiThrottle.h"
 #include "DCC.h"
+#include "DccManager.h"
 #include "DCCWaveform.h"
 #include "StringFormatter.h"
-#include "Turnouts.h"
+#include "Turnout.h"
 #include "DIAG.h"
 #include "GITHUB_SHA.h"
 #include "version.h"
@@ -82,7 +83,7 @@ WiThrottle::WiThrottle( int wificlientid) {
    clientid=wificlientid;
    initSent=false; // prevent sending heartbeats before connection completed
    heartBeatEnable=false; // until client turns it on
-   turnoutListHash = -1;  // make sure turnout list is sent once
+  //  turnoutListHash = -1;  // make sure turnout list is sent once
    for (int loco=0;loco<MAX_MY_LOCO; loco++) myLocos[loco].throttle='\0';
 }
 
@@ -114,13 +115,13 @@ void WiThrottle::parse(RingStream * stream, byte * cmdx) {
       lastPowerState = currentPowerState;  
     }
     // Send turnout list if changed since last sent (will replace list on client)
-    if (turnoutListHash != Turnout::turnoutlistHash) {
+    if (DCC_MANAGER->turnouts->hasChanged ()) {  // WAS if (turnoutListHash != Turnout::turnoutlistHash) {
       StringFormatter::send(stream,F("PTL"));
-      for(Turnout *tt=Turnout::firstTurnout;tt!=NULL;tt=tt->nextTurnout){
-          StringFormatter::send(stream,F("]\\[%d}|{%d}|{%c"), tt->data.id, tt->data.id, Turnout::isActive(tt->data.id)?'4':'2');
-      }
+
+      DCC_MANAGER->turnouts->walkList ([stream] (int _key, Turnout* turnout) { turnout->sendWifi (stream); }); // WAS
       StringFormatter::send(stream,F("\n"));
-      turnoutListHash = Turnout::turnoutlistHash; // keep a copy of hash for later comparison
+       
+      DCC_MANAGER->turnouts->resetChanged (); // WAS  turnoutListHash = Turnout::turnoutlistHash; // keep a copy of hash for later comparison
     }
   }
 
@@ -141,21 +142,30 @@ void WiThrottle::parse(RingStream * stream, byte * cmdx) {
             else if (cmd[1]=='T' && cmd[2]=='A') { // PTA accessory toggle 
                 int id=getInt(cmd+4); 
                 bool newstate=false;
-                Turnout * tt=Turnout::get(id);
-                if (!tt) {
-                  // If turnout does not exist, create it
-                  int addr = ((id - 1) / 4) + 1;
+
+                Turnout* turnout = DCC_MANAGER->turnouts->get (id);
+                if (turnout == nullptr) {
+                  turnout     = DCC_MANAGER->turnouts->add (id);
+                  int addr    = ((id - 1) / 4) + 1;
                   int subaddr = (id - 1) % 4;
-                  Turnout::create(id,addr,subaddr);
-                  StringFormatter::send(stream, F("HmTurnout %d created\n"),id);
+                  turnout->populate (id, addr, subaddr);
+                  StringFormatter::send (stream, F("HmTurnout %d created\n"), id);
                 }
+        // WAS  // Turnout * tt=Turnout::get(id);
+                // if (!tt) {
+                //   // If turnout does not exist, create it
+                //   int addr = ((id - 1) / 4) + 1;
+                //   int subaddr = (id - 1) % 4;
+                //   Turnout::create(id,addr,subaddr);
+                //   StringFormatter::send(stream, F("HmTurnout %d created\n"),id);
+                // }
                 switch (cmd[3]) {
-                    case 'T': newstate=true; break;
-                    case 'C': newstate=false; break;
-                    case '2': newstate=!Turnout::isActive(id);                 
+                    case 'T': newstate = true;  break;
+                    case 'C': newstate = false; break;
+                    case '2': newstate = !turnout->isActive (); // WAS  case '2': newstate=!Turnout::isActive(id);             
                 }
-		            Turnout::activate(id,newstate);
-                StringFormatter::send(stream, F("PTA%c%d\n"),newstate?'4':'2',id );   
+		            turnout->activate (newstate);  // WAS  Turnout::activate(id,newstate);
+                StringFormatter::send (stream, F("PTA%c%d\n"), newstate ? '4' : '2', id );   
             }
             break;
        case 'N':  // Heartbeat (2), only send if connection completed by 'HU' message

@@ -44,6 +44,8 @@
  *  along with CommandStation.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#undef UNIT_TEST_
+#ifndef UNIT_TEST
 
 #include "DCCEX.h"
 
@@ -143,3 +145,5 @@ void loop()
     LCD(2,F("Free RAM=%5db"), ramLowWatermark);
   }
 }
+
+#endif

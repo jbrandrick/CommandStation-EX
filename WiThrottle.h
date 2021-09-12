@@ -53,7 +53,7 @@ class WiThrottle {
       bool heartBeatEnable;
       unsigned long heartBeat;
       bool initSent; // valid connection established
-      int turnoutListHash;  // used to check for changes to turnout list
+      // int turnoutListHash;  // used to check for changes to turnout list
       bool lastPowerState;  // last power state sent to this client
       int DCCToWiTSpeed(int DCCSpeed);
       int WiTToDCCSpeed(int WiTSpeed);

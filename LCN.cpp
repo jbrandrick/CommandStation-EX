@@ -19,8 +19,9 @@
 
 #include "LCN.h"
 #include "DIAG.h"
-#include "Turnouts.h"
-#include "Sensors.h"
+#include "DccManager.h"
+#include "Turnout.h"
+#include "Sensor.h"
 
 int  LCN::id = 0;
 Stream * LCN::stream=NULL;
@@ -46,22 +47,28 @@ void LCN::loop() {
     if (ch >= 0 && ch <= '9') {  // accumulate id value
       id = 10 * id + ch - '0';
     }
+
     else if (ch == 't' || ch == 'T') { // Turnout opcodes
       if (Diag::LCN) DIAG(F("LCN IN %d%c"),id,(char)ch);
-      Turnout * tt = Turnout::get(id);
-      if (!tt) Turnout::create(id, LCN_TURNOUT_ADDRESS, 0);
-      if (ch == 't') tt->data.tStatus |= STATUS_ACTIVE;
-      else   tt->data.tStatus &= ~STATUS_ACTIVE;
-      Turnout::turnoutlistHash++; // signals ED update of turnout data
+
+      Turnout* turnout = DCC_MANAGER->turnouts->getOrAdd (id); // WAS Turnout * tt = Turnout::get(id);
+      turnout->populate (id, LCN_TURNOUT_ADDRESS, 0);  // WAS if (!tt) Turnout::create(id, LCN_TURNOUT_ADDRESS, 0);
+      
+      if (ch == 't') turnout->data.tStatus |= STATUS_ACTIVE;
+      else   turnout->data.tStatus &= ~STATUS_ACTIVE;
+      // WAS Turnout::turnoutlistHash++; // signals ED update of turnout data
       id = 0;
     }
+
     else if (ch == 'S' || ch == 's') {
       if (Diag::LCN) DIAG(F("LCN IN %d%c"),id,(char)ch);
-      Sensor * ss = Sensor::get(id);
-      if (!ss) ss = Sensor::create(id, 255,0); // impossible pin
-      ss->active = ch == 'S';
+
+      Sensor* sensor = DCC_MANAGER->sensors->getOrAdd (id); // WAS Sensor * ss = Sensor::get(id);
+      sensor->populate (SENSOR_TYPE::DIGITAL, id, 255, 0); // WAS if (!ss) ss = Sensor::create(id, 255,0); // impossible pin
+      sensor->active = (ch == 'S');
       id = 0;
     }
+    
     else  id = 0; // ignore any other garbage from LCN
   }
 }

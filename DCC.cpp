@@ -19,8 +19,8 @@
  */
 #include "DIAG.h"
 #include "DCC.h"
+#include "DccManager.h"
 #include "DCCWaveform.h"
-#include "EEStore.h"
 #include "GITHUB_SHA.h"
 #include "version.h"
 #include "FSH.h"
@@ -52,9 +52,11 @@ void DCC::begin(const FSH * motorShieldName, MotorDriver * mainDriver, MotorDriv
   shieldName=(FSH *)motorShieldName;
   StringFormatter::send(Serial,F("<iDCC-EX V-%S / %S / %S G-%S>\n"), F(VERSION), F(ARDUINO_TYPE), shieldName, F(GITHUB_SHA));
 
+  // init DCC_MANAGER
+  DCC_MANAGER->init ();
   // Load stuff from EEprom
   (void)EEPROM; // tell compiler not to warn this is unused
-  EEStore::init();
+  DCC_MANAGER->eeStore->init ();  // WAS EEStore::init();
 
   DCCWaveform::begin(mainDriver,progDriver); 
 }

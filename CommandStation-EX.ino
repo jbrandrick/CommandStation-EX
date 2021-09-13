@@ -44,7 +44,7 @@
  *  along with CommandStation.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#undef UNIT_TEST_
+#undef UNIT_TEST
 #ifndef UNIT_TEST
 
 #include "DCCEX.h"

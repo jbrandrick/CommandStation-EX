@@ -4,7 +4,7 @@
  To begin with this is an example of what may be possible. I don't have experience running DCC++EX other than on a short bit of track with a sensor at each end. Certainly actually using this code would necesitate changes but I'm hopeful they would be simpler to implement and test, after refactoring. That said, the objectives of the refactoring were three fold.
 
 * To continue scratching the itch. I have recently retired from a career developing software. The last 13 involved the analysis of large scale legacy systems, including writing tools to aid in the effort.
-* To pull apart the tight coupling between the functional parts of DCC++EX. To remove the need for them to know of others intimate internals and to expose their own. And make them individually testable.
+* To pull apart the tight coupling between the functional parts of DCC++EX. To remove the need for each to know of other's intimate internals and the need for them to expose their own. And to make them individually testable.
 * To showcase the capabilities of modern C++ with the hope that other developers would have reason to upgrade their skills. This may seem arrogant but in speaking with many legacy system developers they often are interested in new developments and are looking for a way forward.
 
 The initial work involved removing the static variables and functions from the Sensor struct. A significant part of this required implementing a linked list that was separate from the functional components implementing this independently, namely Sensor, Output & Turnout. Keeping with the theme of being wary of library functions, this became the HashList class.

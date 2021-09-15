@@ -20,7 +20,7 @@ The Sensors.cpp/h, Outputs.cpp/h & Turnouts.cpp/h were removed since they implem
 
 The EEStore class was refactored to reference the new Sensor, Output & Turnout classes. The load and store functions were removed from those classes and made part of EEStore. The load functions use the HashList getOrAdd and the Sensor, etc populate functions are called in building the lists. The store function uses the HashList walkList function to navigate each of these. Output and Turnout contain a holding variable for the data offset into their location in the EEPROM.
 
-Similar to EEStore, DCCEXParser and WiThrottle were changed to access the Sensor, Output & Turnout classes. The parseT, parseS, parseZ and parseD functions in DCCEXParser reflect these changes. In the parse function in WiThrottle are calles to check if the turnout list has changed as well as to walk the list. Search for DCC_MANAGER in the code.
+Similar to EEStore, DCCEXParser, LCN and WiThrottle were changed to access the Sensor, Output & Turnout classes. The parseT, parseS, parseZ and parseD functions in DCCEXParser reflect these changes. Similar in LCN::loop(). In the parse function in WiThrottle are calls to check if the turnout list has changed as well as to walk the list. Search for DCC_MANAGER in the code.
 
 Since the Sensor, Output & Turnout instances and the EEStore instance need a home, there is the DccManager class. It's implemented as a singleton and accessed via the DCC_MANAGER macro. If desired the implementation type for DccManager can be changed by changing this macro. This would not affect the rest of the code base. The checkSensor and issueLocoReminders functions are implemented here but likely would move into other refactored areas in the code.
 

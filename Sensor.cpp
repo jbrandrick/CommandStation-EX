@@ -2,36 +2,24 @@
 
 
 void Sensor::populate (SensorData dataIn) {
-  populate (dataIn.type, dataIn.snum, dataIn.pin, dataIn.pullUp, dataIn.threshold);
+  populate (dataIn.snum, dataIn.pin, dataIn.pullUp);
 }
 
 
-void Sensor::populate (SENSOR_TYPE type, int snum, int pin, int pullUp, int threshold) {
-  data.type       = type;
+void Sensor::populate (int snum, int pin, int pullUp) {
   data.snum       = snum;
   data.pin        = pin;
   data.pullUp     = (pullUp == 0 ? LOW : HIGH);
-  data.threshold  = threshold;
 
-  if (data.type == ANALOG) {
-    analogWrite (pin, pullUp);   // ????? don't use Arduino's internal pull-up resistors for
-                                   // external infrared sensors
-                                   // each sensor must have its own 1K external pull-up resistor
-  } else if (data.type == DIGITAL) {
-    pinMode (pin, INPUT);         // set mode to input
-    digitalWrite (pin, pullUp);   // don't use Arduino's internal pull-up resistors for
-                                    // external infrared sensors
-                                    // each sensor must have its own 1K external pull-up resistor
-  }
+  pinMode (pin, INPUT);         // set mode to input
+  digitalWrite (pin, pullUp);   // don't use Arduino's internal pull-up resistors for
+                                // external infrared sensors
+                                // each sensor must have its own 1K external pull-up resistor
 }
 
 
 bool Sensor::read () {
-  if (data.type == DIGITAL) return !digitalRead (data.pin );
-
-  if (data.type == ANALOG) return (analogRead (data.pin ) < data.threshold);
-  
-  return false;
+  return !digitalRead (data.pin );
 }
 
 

@@ -64,7 +64,7 @@ void LCN::loop() {
       if (Diag::LCN) DIAG(F("LCN IN %d%c"),id,(char)ch);
 
       Sensor* sensor = DCC_MANAGER->sensors->getOrAdd (id); // WAS Sensor * ss = Sensor::get(id);
-      sensor->populate (SENSOR_TYPE::DIGITAL, id, 255, 0); // WAS if (!ss) ss = Sensor::create(id, 255,0); // impossible pin
+      sensor->populate (id, 255, 0); // WAS if (!ss) ss = Sensor::create(id, 255,0); // impossible pin
       sensor->active = (ch == 'S');
       id = 0;
     }

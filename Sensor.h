@@ -4,17 +4,10 @@
 #include "Arduino.h"
 #include "StringFormatter.h"
 
-enum SENSOR_TYPE : byte {
-  ANALOG,
-  DIGITAL,
-}; 
-
 struct SensorData {
   int         snum;
   uint8_t     pin;
   uint8_t     pullUp;
-  uint8_t     threshold;
-  SENSOR_TYPE type;
 };
 
 class Sensor {
@@ -30,7 +23,7 @@ class Sensor {
     }
 
     void populate (SensorData);
-    void populate (SENSOR_TYPE, int, int, int, int = 0);
+    void populate (int, int, int);
     void check (Print *);
     bool read ();
 

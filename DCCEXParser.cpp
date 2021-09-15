@@ -698,15 +698,9 @@ bool DCCEXParser::parseS (Print *stream, int16_t paramCount, int16_t params[])  
 
   switch (paramCount)
   {
-    case 4: // <S id pin pullup threshold>  create analog sensor. pullUp indicator (0=LOW/1=HIGH)
-      sensor = DCC_MANAGER->sensors->getOrAdd (params[0]);
-      sensor->populate (SENSOR_TYPE::ANALOG, params[0], params[1], params[2], params[3]);
-      StringFormatter::send (stream, F("<O>\n"));
-      return true;
-
     case 3: // <S id pin pullup>  create sensor. pullUp indicator (0=LOW/1=HIGH)
       sensor = DCC_MANAGER->sensors->getOrAdd (params[0]);
-      sensor->populate (SENSOR_TYPE::DIGITAL, params[0], params[1], params[2]);
+      sensor->populate (params[0], params[1], params[2]);
       StringFormatter::send (stream, F("<O>\n"));
       return true;
 
